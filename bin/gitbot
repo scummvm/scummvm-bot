@@ -1,11 +1,10 @@
 #!/usr/bin/env ruby
 
-require "date"
 require "cinch"
 require "sinatra"
 require "yaml"
 require "json"
-require 'net/http'
+require "net/http"
 
 config_file = ARGV.shift || "config.yml"
 if not File.exists? config_file
@@ -19,11 +18,12 @@ $config = YAML.load_file config_file
 $bot = Cinch::Bot.new do
   configure do |c|
     c.nick = $config["irc"]["nick"]
-    c.user = "gitbot"
-    c.realname = "GitBot"
+    c.user = "Scummette"
+    c.realname = "Razor"
     c.server = $config["irc"]["server"]
     c.port = $config["irc"]["port"]
-    # c.channels = $config["irc"]["channels"]
+    c.password = $config["irc"]["password"]
+    c.channels = $config["irc"]["channels"]
   end
 end
 
@@ -74,20 +74,28 @@ post "/github" do
   branch = push["ref"].gsub(/^refs\/heads\//,"")
   pusher = push["pusher"]["name"]
   numberOfCommits = push["commits"].length
+  forced = push["forced"]
 
   uri = URI('https://git.io')
   res = Net::HTTP.post_form(uri, 'url' => push["compare"])
   url = res['location']
 
-  join
-  # output first 3 commits
-  say repo, "[#{repo}] #{pusher} pushed #{numberOfCommits} new commits to #{branch}: #{url}"
-
-  push["commits"].each do |c|
-    # say repo, "\0030#{repo}:\0037 #{branch}\0033 #{c["author"]["name"]}\003 #{c["message"]}"
-    say repo, "hello"
+  say repo, "[%s], %s pushed %s new commits to %s: %s" % [
+    $bot.Format(:purple, repo),
+    pusher,
+    $bot.Format(:bold, numberOfCommits.to_s),
+    $bot.Format(:purple, branch),
+    $bot.Format(:aqua, $bot.Format(:underline, url))
+  ]
+  push["commits"][0..2].each do |c|
+    say repo, "%s/%s %s %s: %s" % [
+      $bot.Format(:purple, repo),
+      $bot.Format(:purple, branch),
+      $bot.Format(:grey, c["id"].slice(0..6)),
+      c["author"]["name"],
+      c["message"].split("\n")[0]
+    ]
   end
-  part
 
   push.inspect
 end
