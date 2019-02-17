@@ -31,9 +31,9 @@ Thread.new do
   $bot.start
 end
 
-def verify_signature(payload_body)
+def verify_signature(payload_body, github_signature)
   signature = 'sha1=' + OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new('sha1'), ENV['IRC_WEBHOOK'], payload_body)
-  return halt 500, "Signatures didn't match!" unless Rack::Utils.secure_compare(signature, request.env['HTTP_X_HUB_SIGNATURE'])
+  return halt 500, "Signatures didn't match!" unless Rack::Utils.secure_compare(signature, github_signature)
 end
 
 def say(repo,msg)
@@ -74,7 +74,7 @@ end
 post "/github" do
   request.body.rewind
   payload_body = request.body.read
-  verify_signature(payload_body)
+  verify_signature(payload_body, request.env['HTTP_X_HUB_SIGNATURE'])
   push = JSON.parse(params[:payload])
 
   repo = push["repository"]["name"]
