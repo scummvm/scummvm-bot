@@ -31,6 +31,11 @@ Thread.new do
   $bot.start
 end
 
+def verify_signature(payload_body)
+  signature = 'sha1=' + OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new('sha1'), ENV['IRC_WEBHOOK'], payload_body)
+  return halt 500, "Signatures didn't match!" unless Rack::Utils.secure_compare(signature, request.env['HTTP_X_HUB_SIGNATURE'])
+end
+
 def say(repo,msg)
   $config["irc"]["channels"].each do |chan|
     unless $config["filters"].include? chan and not $config["filters"][chan].include? repo
@@ -67,8 +72,10 @@ get "/" do
 end
 
 post "/github" do
-  p params[:payload]
-  push = JSON.parse(request.body.read)
+  request.body.rewind
+  payload_body = request.body.read
+  verify_signature(payload_body)
+  push = JSON.parse(params[:payload])
 
   repo = push["repository"]["name"]
   branch = push["ref"].gsub(/^refs\/heads\//,"")
