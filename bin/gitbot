@@ -76,34 +76,55 @@ post "/github" do
   request.body.rewind
   payload_body = request.body.read
   verify_signature(payload_body, request.env['HTTP_X_HUB_SIGNATURE'])
+  eventType = request.env['HTTP_X_GITHUB_EVENT']
   push = JSON.parse(params[:payload])
 
   repo = push["repository"]["name"]
-  branch = push["ref"].gsub(/^refs\/heads\//,"")
-  pusher = push["pusher"]["name"]
-  numberOfCommits = push["commits"].length
-  forced = push["forced"]
+  sender = push["sender"]["login"]
 
-  uri = URI('https://git.io')
-  res = Net::HTTP.post_form(uri, 'url' => push["compare"])
-  url = res['location']
-
-  say repo, "[%s], %s pushed %s new commits to %s: %s" % [
-    $bot.Format(:purple, repo),
-    pusher,
-    $bot.Format(:bold, numberOfCommits.to_s),
-    $bot.Format(:purple, branch),
-    $bot.Format(:aqua, $bot.Format(:underline, url))
-  ]
-  push["commits"][0..2].each do |c|
-    say repo, "%s/%s %s %s: %s" % [
+  case eventType
+  when "pull_request"
+    return halt 200 unless ["opened", "closed", "reopened"].include?(push["action"])
+    res = Net::HTTP.post_form(URI('https://git.io'), 'url' => push["pull_request"]["url"])
+    url = res['location']
+    say repo, "[%s] %s %s pull request #%s: %s (%s) %s" % [
       $bot.Format(:purple, repo),
-      $bot.Format(:purple, branch),
-      $bot.Format(:grey, c["id"].slice(0..6)),
-      c["author"]["name"],
-      c["message"].split("\n")[0]
+      sender,
+      $bot.Format(:bold, push["action"]),
+      $bot.Format(:bold, push["number"].to_s),
+      push["pull_request"]["title"],
+      $bot.Format(:purple, "%s...%s" % [
+        push["pull_request"]["base"]["ref"],
+        push["pull_request"]["head"]["ref"]
+      ]),
+      $bot.Format(:aqua, $bot.Format(:underline, url))
     ]
+  when "push"
+    res = Net::HTTP.post_form(URI('https://git.io'), 'url' => push["compare"])
+    url = res['location']
+    branch = push["ref"].gsub(/^refs\/heads\//,"")
+    numberOfCommits = push["commits"].length
+    forced = push["forced"]
+    say repo, "[%s], %s %s %s new commits to %s: %s" % [
+      $bot.Format(:purple, repo),
+      sender,
+      forced ? "force pushed" : "pushed",
+      $bot.Format(:bold, numberOfCommits.to_s),
+      $bot.Format(:purple, branch),
+      $bot.Format(:aqua, $bot.Format(:underline, url))
+    ]
+    push["commits"][0..2].each do |c|
+      say repo, "%s/%s %s %s: %s" % [
+        $bot.Format(:purple, repo),
+        $bot.Format(:purple, branch),
+        $bot.Format(:grey, c["id"].slice(0..6)),
+        c["author"]["username"],
+        c["message"].split("\n")[0]
+      ]
+    end
   end
+
+
 
   push.inspect
 end
