@@ -105,7 +105,7 @@ post "/github" do
     branch = push["ref"].gsub(/^refs\/heads\//,"")
     numberOfCommits = push["commits"].length
     forced = push["forced"]
-    say repo, "[%s], %s %s %s new commits to %s: %s" % [
+    say repo, "[%s] %s %s %s new commits to %s: %s" % [
       $bot.Format(:purple, repo),
       sender,
       forced ? "force pushed" : "pushed",
