@@ -85,7 +85,7 @@ post "/github" do
   case eventType
   when "pull_request"
     return halt 200 unless ["opened", "closed", "reopened"].include?(push["action"])
-    res = Net::HTTP.post_form(URI('https://git.io'), 'url' => push["pull_request"]["url"])
+    res = Net::HTTP.post_form(URI('https://git.io'), 'url' => push["pull_request"]["html_url"])
     url = res['location']
     say repo, "[%s] %s %s pull request #%s: %s (%s) %s" % [
       $bot.Format(:purple, repo),
