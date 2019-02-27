@@ -76,6 +76,9 @@ post "/github" do
   request.body.rewind
   payload_body = request.body.read
   verify_signature(payload_body, request.env['HTTP_X_HUB_SIGNATURE'])
+
+  $bot.nick = $config["irc"]["nick"]
+
   eventType = request.env['HTTP_X_GITHUB_EVENT']
   push = JSON.parse(params[:payload])
 
