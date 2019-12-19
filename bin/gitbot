@@ -25,6 +25,8 @@ $bot = Cinch::Bot.new do
     c.port = $config["irc"]["port"]
     c.password = $config["irc"]["password"]
     c.channels = $config["irc"]["channels"]
+    c.ping_interval = 120
+    c.timeouts.read = 480
   end
 end
 
