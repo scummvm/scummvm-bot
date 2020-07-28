@@ -6,7 +6,7 @@ GEM
     cinch (2.3.4)
     htmlentities (4.3.4)
     jaro_winkler (1.5.3)
-    json (2.2.0)
+    json (2.3.0)
     kramdown (1.17.0)
     mini_portile2 (2.4.0)
     mustermann (1.0.3)
@@ -55,7 +55,7 @@ PLATFORMS
 
 DEPENDENCIES
   cinch (~> 2.3)
-  json (~> 2.1)
+  json (~> 2.3)
   sinatra (~> 2.0)
   solargraph (~> 0.31.3)
 
