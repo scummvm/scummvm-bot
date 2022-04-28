@@ -91,41 +91,53 @@ post "/github" do
   when "pull_request"
     return halt 200 unless ["opened", "closed", "reopened"].include?(push["action"])
     res = Net::HTTP.post_form(URI('https://is.gd/create.php'), { 'format' => 'simple', 'url' => push["pull_request"]["html_url"] })
-    url = res.body
-    say repo, "[%s] %s %s pull request #%s: %s (%s) %s" % [
-      $bot.Format(:purple, repo),
-      sender,
-      $bot.Format(:bold, push["action"]),
-      $bot.Format(:bold, push["number"].to_s),
-      push["pull_request"]["title"],
-      $bot.Format(:purple, "%s...%s" % [
-        push["pull_request"]["base"]["ref"],
-        push["pull_request"]["head"]["ref"]
-      ]),
-      $bot.Format(:aqua, $bot.Format(:underline, url))
-    ]
+    case res
+    when Net::HTTPSuccess, Net::HTTPRedirection
+        url = res.body
+        say repo, "[%s] %s %s pull request #%s: %s (%s) %s" % [
+          $bot.Format(:purple, repo),
+          sender,
+          $bot.Format(:bold, push["action"]),
+          $bot.Format(:bold, push["number"].to_s),
+          push["pull_request"]["title"],
+          $bot.Format(:purple, "%s...%s" % [
+            push["pull_request"]["base"]["ref"],
+            push["pull_request"]["head"]["ref"]
+          ]),
+          $bot.Format(:aqua, $bot.Format(:underline, url))
+        ]
+    else
+        # Post Failed i.e. 502
+        # FIXME: do say with error message? i.e. res.value
+    end
   when "push"
     res = Net::HTTP.post_form(URI('https://is.gd/create.php'), { 'format' => 'simple', 'url' => push["compare"] })
-    url = res.body
-    branch = push["ref"].gsub(/^refs\/heads\//,"")
-    numberOfCommits = push["commits"].length
-    forced = push["forced"]
-    say repo, "[%s] %s %s %s new commits to %s: %s" % [
-      $bot.Format(:purple, repo),
-      sender,
-      forced ? "force pushed" : "pushed",
-      $bot.Format(:bold, numberOfCommits.to_s),
-      $bot.Format(:purple, branch),
-      $bot.Format(:aqua, $bot.Format(:underline, url))
-    ]
-    push["commits"][0..2].each do |c|
-      say repo, "%s/%s %s %s: %s" % [
-        $bot.Format(:purple, repo),
-        $bot.Format(:purple, branch),
-        $bot.Format(:grey, c["id"].slice(0..6)),
-        c["author"]["username"],
-        c["message"].split("\n")[0]
-      ]
+    case res
+    when Net::HTTPSuccess, Net::HTTPRedirection
+        url = res.body
+        branch = push["ref"].gsub(/^refs\/heads\//,"")
+        numberOfCommits = push["commits"].length
+        forced = push["forced"]
+        say repo, "[%s] %s %s %s new commits to %s: %s" % [
+          $bot.Format(:purple, repo),
+          sender,
+          forced ? "force pushed" : "pushed",
+          $bot.Format(:bold, numberOfCommits.to_s),
+          $bot.Format(:purple, branch),
+          $bot.Format(:aqua, $bot.Format(:underline, url))
+        ]
+        push["commits"][0..2].each do |c|
+          say repo, "%s/%s %s %s: %s" % [
+            $bot.Format(:purple, repo),
+            $bot.Format(:purple, branch),
+            $bot.Format(:grey, c["id"].slice(0..6)),
+            c["author"]["username"],
+            c["message"].split("\n")[0]
+          ]
+        end
+    else
+        # Post Failed i.e. 502
+        # FIXME: do say with error message? i.e. res.value
     end
   end
 
