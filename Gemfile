@@ -1,12 +1,2 @@
-# frozen_string_literal: true
-
 source "https://rubygems.org"
-
-git_source(:github) {|repo_name| "https://github.com/#{repo_name}" }
-
-# gem "rails"
-
-gem "cinch", "~> 2.3"
-gem "solargraph", "~> 0.40.4"
-gem "json", "~> 2.3"
-gem "sinatra", "~> 2.0"
+gemspec

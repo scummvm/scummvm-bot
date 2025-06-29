@@ -23,13 +23,13 @@ Gem::Specification.new do |s|
     "README.markdown"
   ]
 
-  s.default_executable = %q{gitbot}
-
-  s.add_runtime_dependency(%q<cinch>)
+  s.add_runtime_dependency(%q<ircinch>)
   s.add_runtime_dependency(%q<sinatra>)
+  s.add_runtime_dependency(%q<rackup>)
+  s.add_runtime_dependency(%q<puma>)
   s.add_runtime_dependency(%q<json>, [">= 0"])
 
   s.add_development_dependency(%q<bundler>)
 
-  s.required_ruby_version = Gem::Requirement.new(">= 1.9.1")
+  s.required_ruby_version = Gem::Requirement.new(">= 3.1.0")
 end

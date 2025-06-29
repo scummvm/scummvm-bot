@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require "cinch"
+require "ircinch"
 require "sinatra"
 require "yaml"
 require "json"
@@ -36,6 +36,7 @@ end
 
 def verify_signature(payload_body, github_signature)
   signature = 'sha1=' + OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new('sha1'), $secret, payload_body)
+  github_signature = "" if github_signature.nil?
   return halt 500, "Signatures didn't match!" unless Rack::Utils.secure_compare(signature, github_signature)
 end
 
@@ -66,6 +67,7 @@ end
 configure do
   set :bind, $config["http"]["host"]
   set :port, $config["http"]["port"]
+  set :host_authorization, { permitted_hosts: [] }
   set :logging, false
   set :lock, true
 end
