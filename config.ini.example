@@ -1,0 +1,32 @@
+[irc]
+# The IRC server to use
+server = irc.libera.chat
+port = 7000
+tls = yes
+# Path to the CA for TLS certificate validation
+#ca_path = 
+# The server password: this is not the user account password
+#server_password = 
+nick = Commitbot
+# The user and password for the account owning the nick
+#sasl_user = Commitbot
+#sasl_pass = CommitbotPassword
+# Username and real name displayed in WHOIS result
+username = Commitbot
+realname = Commit monitoring bot
+# List of channels space-separated
+# To specify a password append it to the channel name after a comma
+channels = #channel #privatechannel,password
+# Only post dummy-repo related events to #channel
+filter.#channel = dummy-repo
+
+[http]
+# The listening address and port of the HTTP webhook listener
+host = 127.0.0.1
+port = 5651
+# Github secret to check the hook data signature
+github_secret = secret
+
+[formatter]
+# Shortener service to use: v.gd is also possible
+shortener_domain = is.gd
