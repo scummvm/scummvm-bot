@@ -1,0 +1,73 @@
+[build-system]
+requires = ['setuptools >= 77.0.3']
+build-backend = 'setuptools.build_meta'
+
+[dependency-groups]
+lint = [
+    'mypy>=1.0.0,<1.17.0',
+    'mypy_zope==1.0.12',
+    'ruff',
+]
+
+[project]
+name = 'commitbot'
+version = '0.9'
+requires-python = '>=3.9'
+authors = [
+  { name="Le Philousophe", email='lephilousophe@users.noreply.github.com' },
+]
+description = "A small IRC bot"
+readme = 'README.md'
+dependencies = [
+    'twisted >= 21.2.0',
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = 'AGPL-3.0'
+license-files = ['LICEN[CS]E*']
+
+[project.optional-dependencies]
+tls = [
+    'twisted[tls]',
+]
+
+[project.scripts]
+commitbot = 'commitbot.__main__:main'
+
+[project.urls]
+Homepage = 'https://github.com/lephilousophe/commitbot'
+Issues = 'https://github.com/lephilousophe/commitbot/issues'
+
+[tool.ruff]
+include = ['commitbot/*.py', 'pyproject.toml']
+line-length = 120
+
+[tool.ruff.lint]
+select = ['ALL']
+ignore = [
+	'DJ',     # No Django
+	'AIR',    # No Airflow
+	'FAST',   # No FastAPI
+	'PD',     # No Pandas
+	'NPY',    # No Numpy
+
+	'D',      # Ignore docs issues
+	'N',      # Ignore naming errors (Twisted is not clean on that)
+	'PTH',    # No need of pathlib linting: not much path stuff
+	'G010',   # False positive with Twisted logging module
+	'Q000',   # Ignore quotes style
+	'S101',   # Ignore use of assert
+]
+
+[tool.mypy]
+files = 'commitbot/*.py'
+
+plugins = 'mypy_zope:plugin'
+
+warn_unused_configs = true
+strict = true
+allow_redefinition = true
+disallow_untyped_calls = false # Some Twisted functions are not annotated
