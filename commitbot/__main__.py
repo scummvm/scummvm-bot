@@ -61,7 +61,7 @@ class CommitFormatter:
             for c in commits[0:3]:
                 msg = A.normal[A.fg.magenta[repo], "/", A.fg.magenta[branch], " ",
                                A.fg.gray[c['id'][0:7]], " ",
-                               c['author']['username'], ": ",
+                               c['author']['username'] if 'username' in c['author'] else c['author']['name'], ": ",
                                c['message'].split('\n', maxsplit=1)[0]]
                 self.irc.notify(repo, assembleFormattedText(msg))
 
