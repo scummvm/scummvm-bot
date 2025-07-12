@@ -23,8 +23,9 @@ class CommitBot(irc.IRCClient):
     transport: abstract.FileDescriptor | None = None
 
     def __init__(self) -> None:
+        self.pendingChannels : set[str] = set()
         self.channelsJoined : set[str] = set()
-        self.saslTimeout : base.DelayedCall | None = None
+        self.timeout : base.DelayedCall | None = None
         self.saslData : str | None = None
 
     def notify(self, tag: str, message: str) -> None:
@@ -52,10 +53,10 @@ class CommitBot(irc.IRCClient):
         self.nickname = config['nick']
         self.username = config['username']
         self.realname = config['realname'] # type: ignore[assignment]
-        self.channelsToJoin = [cp.rsplit(',', maxsplit=1) for cp in config['channels'].split()]
+        self.channels = [cp.rsplit(',', maxsplit=1) for cp in config['channels'].split()]
 
         self.filters : dict[str, list[str]] = {}
-        for cp in self.channelsToJoin:
+        for cp in self.channels:
             filt = config.get(f'filter.{cp[0]}')
             if filt is None:
                 continue
@@ -103,7 +104,7 @@ class CommitBot(irc.IRCClient):
             self.sendLine('AUTHENTICATE PLAIN')
             assert(self.transport)
             reactor = typing.cast('base.ReactorBase', self.transport.reactor)
-            self.saslTimeout = reactor.callLater(10, self._saslTimedout)
+            self.timeout = reactor.callLater(10, self._saslTimedout)
 
     def irc_AUTHENTICATE(self, _prefix: str, params: list[str]) -> None:
         if len(params) > 1:
@@ -157,16 +158,16 @@ class CommitBot(irc.IRCClient):
     irc_907 = irc_903 # ERR_SASLALREADY
 
     def _saslEnd(self) -> None:
-        if self.saslTimeout:
-            self.saslTimeout.cancel()
-            self.saslTimeout = None
+        if self.timeout:
+            self.timeout.cancel()
+            self.timeout = None
         # End negotiation to finish the register
         self.sendLine('CAP END')
 
     def _saslTimedout(self) -> None:
-        if self.saslTimeout is None:
+        if self.timeout is None:
             return
-        self.saslTimeout = None
+        self.timeout = None
         self.log.warn("SASL authentication timed out")
         # End negotiation to finish the register
         self.sendLine('CAP END')
@@ -176,9 +177,7 @@ class CommitBot(irc.IRCClient):
         self.log.info("Signed on")
         assert(self.factory)
         self.factory.protocolReady(self)
-        if self.channelsToJoin:
-            channel = self.channelsToJoin.pop()
-            self.join(*channel)
+        self.multiJoin(self.channels)
 
     def alterCollidedNick(self, nickname: str) -> str:
         assert(self.transport)
@@ -186,13 +185,95 @@ class CommitBot(irc.IRCClient):
         reactor.callLater(30, self.setNick, nickname)
         return nickname + '_'
 
+    def join(self, channel: str, key: str | None = None) -> None:
+        assert(self.timeout is None)
+        super().join(channel, key)
+        self.pendingChannels.add(channel)
+        reactor = typing.cast('base.ReactorBase', self.transport.reactor)
+        self.timeout = reactor.callLater(30, self._joinTimeout)
+
+    def multiJoin(self, channels: list[str | tuple[str, str]]) -> None:
+        assert(self.timeout is None)
+
+        # MAX_COMMAND_LENGTH - JOIN - \r\n
+        # spaces are included in the length count
+        max_length = irc.MAX_COMMAND_LENGTH - 4 - 2
+
+        channels = list(channels)
+        while len(channels):
+            ln = 0
+            channels_list = []
+            keys_list = []
+            while len(channels):
+                channel = channels.pop()
+                if channel is str:
+                    channel = (channel, '')
+                if not channel:
+                    continue
+                if len(channel) != 2:
+                    channel = (channel[0], '')
+                if channel[0][0] != '#':
+                    channel = ('#' + channel[0], channel[1])
+                ln += len(channel[0]) + len(channel[1]) + 2 # preceding space or comma
+                if ln > max_length:
+                    channels.append(channel)
+                    break
+
+                channels_list.append(channel[0])
+                keys_list.append(channel[1])
+                self.pendingChannels.add(channel[0])
+
+            if all(not k for k in keys_list):
+                self.sendLine("JOIN {}".format(','.join(channels_list)))
+            else:
+                self.sendLine("JOIN {} {}".format(','.join(channels_list), ','.join(keys_list)))
+
+        reactor = typing.cast('base.ReactorBase', self.transport.reactor)
+        self.timeout = reactor.callLater(30, self._joinTimeout)
+
     def joined(self, channel: str) -> None:
         """This will get called when the bot joins the channel."""
         self.log.info("Channel {channel} joined", channel=channel)
         self.channelsJoined.add(channel)
-        if self.channelsToJoin:
-            cp = self.channelsToJoin.pop()
-            self.join(*cp)
+        self.pendingChannels.discard(channel)
+        if not self.pendingChannels and self.timeout:
+            self.timeout.cancel()
+            self.timeout = None
+
+    def joinError(self, channel: str | None, reason: str) -> None:
+        self.log.info("Failed to join {channel}: {reason}", channel=channel, reason=reason)
+        self.pendingChannels.discard(channel)
+        if not self.pendingChannels and self.timeout:
+            self.timeout.cancel()
+            self.timeout = None
+
+    def _joinTimeout(self) -> None:
+        if self.timeout is None:
+            return
+        self.timeout = None
+        for channel in self.pendingChannels:
+            self.log.info("Failed to join {channel}: {reason}", channel=channel, reason="Timeout")
+        self.pendingChannels.clear()
+
+    def irc_ERR_INVITEONLYCHAN(self, _prefix: str, params: list[str]) -> None:
+        _nickname, channel, reason = params
+        self.joinError(channel, reason)
+
+    def irc_ERR_CHANNELISFULL(self, _prefix: str, params: list[str]) -> None:
+        _nickname, channel, reason = params
+        self.joinError(channel, reason)
+
+    def irc_ERR_BANNEDFROMCHAN(self, _prefix: str, params: list[str]) -> None:
+        _nickname, channel, reason = params
+        self.joinError(channel, reason)
+
+    def irc_ERR_BADCHANNELKEY(self, _prefix: str, params: list[str]) -> None:
+        _nickname, channel, reason = params
+        self.joinError(channel, reason)
+
+    def irc_ERR_TOOMANYCHANNELS(self, _prefix: str, params: list[str]) -> None:
+        _nickname, channel, reason = params
+        self.joinError(channel, reason)
 
     def kickedFrom(self, channel: str, kicker: str, message: str) -> None:
         self.log.info("Kicked from {channel} by {kicker} (reason: {message})",
@@ -205,7 +286,16 @@ class CommitBot(irc.IRCClient):
             reactor.stop()
             return
 
-        self.join(channel)
+        key = None
+        for c in self.channels:
+            if (c[0] != channel and
+                c[0] != channel[1:]):
+                continue
+            if len(c) > 1:
+                key = c[1]
+            break
+
+        self.join(channel, key)
 
     def saslAuthenticate(self, data: bytes) -> bytes:
         if data != b'':
